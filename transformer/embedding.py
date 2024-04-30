@@ -6,10 +6,10 @@ import hparams
 
 class TransformerEmbedding(nn.Module):
     def __init__(self,
-                 vocab_size, # size of vocabulary
-                 d_model, # hidden size
-                 max_len, # maximum training length
-                 dropout=0.1, # dropout prob
+                 vocab_size: int, # size of vocabulary
+                 d_model: int, # hidden size
+                 max_len: int, # maximum training length
+                 dropout: float=0.1, # dropout prob
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -47,7 +47,7 @@ class TransformerEmbedding(nn.Module):
         return pe
         
 
-    def forward(self, tokens):
+    def forward(self, tokens: torch.Tensor):
         """
         tokens.shape = [batch_size, seq_len]
         """
