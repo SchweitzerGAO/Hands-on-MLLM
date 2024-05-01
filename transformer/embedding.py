@@ -9,7 +9,7 @@ class TransformerEmbedding(nn.Module):
                  vocab_size: int, # size of vocabulary
                  d_model: int, # hidden size
                  max_len: int, # maximum training length
-                 dropout: float=0.1, # dropout prob
+                 p_dropout: float=0.1, # dropout prob
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -20,7 +20,7 @@ class TransformerEmbedding(nn.Module):
         self.pe = self._get_positional_encoding() # positional embedding
 
         self.embed = nn.Embedding(self.vocab_size, self.hidden_size) # Embedding layer
-        self.dropout = nn.Dropout(p=dropout) # dropout layer, mentioned in vanilla transformer paper: https://arxiv.org/pdf/1706.03762 section 5.4
+        self.dropout = nn.Dropout(p=p_dropout) # dropout layer, mentioned in vanilla transformer paper: https://arxiv.org/pdf/1706.03762 section 5.4
 
     def _get_positional_encoding(self, use_exp=True):
         """

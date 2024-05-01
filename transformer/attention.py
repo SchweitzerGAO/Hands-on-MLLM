@@ -12,7 +12,7 @@ class TransformerMultiHeadAttention(nn.Module):
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        assert d_model % n_heads == 0, "d_model must be a multiple of n_heads"
+        # assert d_model % n_heads == 0, "d_model must be a multiple of n_heads"
         self.hidden_size = d_model
         self.n_heads = n_heads
         self.head_dim = self.hidden_size // self.n_heads
@@ -60,9 +60,8 @@ class TransformerMultiHeadAttention(nn.Module):
         if causal_mask is not None:
             # After this causal_mask.shape = [batch_size, n_heads, seq_len, seq_len]
             causal_mask = causal_mask.expand(batch_size, self.n_heads, seq_len, seq_len)
-        
-        # add the causal mask
-        attn_score = attn_score + causal_mask
+            # add the causal mask
+            attn_score = attn_score + causal_mask
 
         # softmax
         attn_score = F.softmax(attn_score,dim=-1) # do softmax in the lowest dimension
@@ -77,14 +76,23 @@ class TransformerMultiHeadAttention(nn.Module):
         '''
         attn_score = torch.matmul(attn_score, v)
 
-        # Concat the heads
+        # Concat the heads, after this, attn_score.shape = [batch_size, seq_len, hidden_size]
         attn_score = attn_score.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_size)
-        return self.Wo(attn_score) # The last projection to generalize the knowledge of heads
+        return self.Wo(attn_score) # The last projection to generalize the knowledge of heads, attn_score = [batch_size, seq_len, hidden_size]
 
 
 
 
 if __name__ == '__main__':
-    pass
+    mha = TransformerMultiHeadAttention(
+        d_model=hparams.hidden_size,
+        n_heads=hparams.n_heads,
+    )
+    batch_size = 2
+    seq_len = 1024
+    q = torch.randn(batch_size, seq_len, hparams.hidden_size)
+    k = torch.randn(batch_size, seq_len, hparams.hidden_size)
+    v = torch.randn(batch_size, seq_len, hparams.hidden_size)
+    print(mha(q, k, v).shape)
         
         
