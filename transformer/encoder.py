@@ -57,7 +57,7 @@ class TransformerEncoder(nn.Module):
                                                 n_heads=n_heads,
                                                 d_ff=4 * d_model,
                                                 p_dropout=p_dropout)
-        self.layers = nn.ModuleList([encoder_block for _ in range(num_layers)])
+        self.layers = nn.ModuleList([encoder_block for _ in range(num_layers)]) # nn.Sequential may also do
     def forward(self, 
                 src:torch.Tensor,
                 src_key_padding_mask:torch.Tensor=None):
@@ -68,7 +68,7 @@ class TransformerEncoder(nn.Module):
         
 
 if __name__ == '__main__':
-    encoder = TransformerEncoder(d_model=hparams.hidden_size,n_heads=hparams.n_heads,num_layers=hparams.num_encoder_layers)
+    encoder = TransformerEncoder(d_model=hparams.hidden_size,n_heads=hparams.n_heads,num_layers=hparams.num_layers)
     batch_size = 2
     seq_len = 1024
     src = torch.randn(batch_size, seq_len, hparams.hidden_size)

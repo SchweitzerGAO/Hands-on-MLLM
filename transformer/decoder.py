@@ -60,9 +60,30 @@ class TransformerDecoderBlock(nn.Module):
         return ffn_out
 
 class TransformerDecoder(nn.Module):
-    def __init__(self, 
+    def __init__(self,
+                 d_model,
+                 n_heads,
+                 num_layers,
+                 p_dropout=0.1, 
                  *args, 
                  **kwargs) -> None:
-        
         super().__init__(*args, **kwargs)
+        decoder_block = TransformerDecoderBlock(d_model=d_model, 
+                                                n_heads=n_heads, 
+                                                d_ff=4 * d_model,
+                                                p_dropout=p_dropout)
+        self.layers = nn.ModuleList([decoder_block for _ in range(num_layers)]) # nn.Sequential may also do
+
+    def forward(self,
+                tgt:torch.Tensor, 
+                memory: torch.Tensor,
+                tgt_causal_mask: torch.Tensor=None,
+                tgt_key_padding_mask: torch.Tensor=None,
+                memory_key_padding_mask: torch.Tensor=None):
+        for layer in self.layers:
+            tgt = layer(tgt,memory,tgt_causal_mask,tgt_key_padding_mask,memory_key_padding_mask)
+        return tgt
+
+
+
 
