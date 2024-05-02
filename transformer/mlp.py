@@ -1,6 +1,5 @@
 import torch 
 import torch.nn as nn
-import hparams
 
 # Reference: https://github.com/YueZhengMeng/MyTransformer/blob/master/MyTransformer.py
 
