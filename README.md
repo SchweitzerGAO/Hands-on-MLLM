@@ -4,7 +4,7 @@
 
 ## TODO
 
-- [x] Transformer(Training Task: Sequence Repeater)
+- [x] Transformer(Training task: Sequence repeater)
 - [ ] BERT
 - [ ] GPT
 - [ ] ViT
