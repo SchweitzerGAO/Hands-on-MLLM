@@ -11,7 +11,7 @@ from preprocess import generate_causal_mask, generate_dataset, generate_key_padd
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-model = Transformer(hparams.vocab_size, hparams.hidden_size, hparams.n_heads, hparams.num_layers)
+model = Transformer(hparams.vocab_size, hparams.hidden_size, hparams.n_heads, hparams.num_layers).to(device)
 
 def seed_everything(seed):
     # 设置随机种子
@@ -34,7 +34,7 @@ def train(batch_size=hparams.batch_size,
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.98), eps=1e-9)
 
     # lr scheduler: cosine annealing 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch, eta_min=8e-6)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epoch)
 
     total_loss = 0
     # start training
@@ -60,7 +60,7 @@ def train(batch_size=hparams.batch_size,
         out = model.lm_head(out)
 
         # this loss mask is used to mask the padding tokens and omit the loss calculation
-        loss_mask = tgt_key_padding_mask.view(-1) # loss_mask.shape = [batch_size * max_length]
+        loss_mask = tgt_key_padding_mask.view(-1) == False # loss_mask.shape = [batch_size * max_length]
 
         # reshape the prediction to fit the input of cross entropy
         prediction = out.view(-1, hparams.vocab_size)[loss_mask] # prediction.shape = [batch_size * max_length, vocab_size]
@@ -86,6 +86,9 @@ def train(batch_size=hparams.batch_size,
 def evaluate(max_length=hparams.max_context_len):
     model.eval()
     test_src, _, _ = generate_dataset(batch_size=1, max_length=max_length)
+    # test_src = torch.LongTensor([[special_tokens.bos, 4, 24, 34, 17, 3, 20, 25, 37, special_tokens.eos]])
+    # test_src = torch.concat([test_src, torch.LongTensor([[special_tokens.pad] * 6])],dim=1)
+    
     # No need to generate tgt_key_padding_mask as not predicted
     predict_tgt = torch.LongTensor([[special_tokens.bos]])
     src_key_padding_mask = generate_key_padding_mask(test_src)
@@ -97,7 +100,7 @@ def evaluate(max_length=hparams.max_context_len):
     src_key_padding_mask = src_key_padding_mask.to(device)
     causal_mask = causal_mask.to(device)
 
-    for _ in range(max_length):
+    for _ in range(max_length - 1):
         out = model(test_src, predict_tgt, causal_mask, src_key_padding_mask, None)
         out = out[:, -1, :] # equivalent to out[:,-1], consider the last one only, shape = [batch_size, vocab_size]
         out = model.lm_head(out)

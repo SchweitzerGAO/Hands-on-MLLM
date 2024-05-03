@@ -29,7 +29,8 @@ class TransformerEmbedding(nn.Module):
         pe[:,0::2] = sin(pos / 10000 ** (2 * i / d_model))
         pe[:,1::2] = cos(pos / 10000 ** (2 * i / d_model))
         """
-        pe = torch.zeros(self.max_len, self.hidden_size)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        pe = torch.zeros(self.max_len, self.hidden_size).to(device)
 
         # generate 2-D positions
         # [[0],[1],[2],...,[max_len - 1]] shape = [max_len, 1]
@@ -44,7 +45,7 @@ class TransformerEmbedding(nn.Module):
         pe[:,0::2] = torch.sin(positions * mul_term)
         pe[:,1::2] = torch.cos(positions * mul_term)
         pe = pe.unsqueeze(0) # pe.shape = [1, max_len, hidden_size], convenient for batchify computing
-        pe.requires_grad_(False)
+        # pe.requires_grad_(False)
         return pe
         
 
@@ -54,7 +55,7 @@ class TransformerEmbedding(nn.Module):
         """
         # embed the tokens
         x = self.embed(tokens) # x.shape = [batch_size, seq_len, hidden_size]
-        x = x + self.pe[:, :x.shape[1], :] # add positional embedding
+        x = x + self.pe[:, :x.shape[1], :].requires_grad_(False) # add positional embedding
         return self.dropout(x) # dropout
 
         
