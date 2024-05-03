@@ -4,7 +4,9 @@
 
 ## TODO
 
-- [ ] Transformer
+- [x] Transformer
+- [ ] BERT
+- [ ] GPT
 - [ ] ViT
 - [ ] BLIP-2 (Q-Former)
 - [ ] DiT

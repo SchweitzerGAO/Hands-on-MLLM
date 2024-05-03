@@ -55,7 +55,10 @@ class TransformerMultiHeadAttention(nn.Module):
         if padding_mask is not None:
             # After this padding_mask.shape = [batch_size, n_heads, seq_len, seq_len]
             padding_mask = padding_mask.unsqueeze(1).unsqueeze(1).repeat(1, self.n_heads, seq_len, 1)
-            # The document for masked_fill is useless
+            '''
+            The document for masked_fill is useless. Referring to https://blog.csdn.net/jianyingyao7658/article/details/103382654, 
+            we can know that the padding_mask is of type `Tensor[bool]` and when `padding_mask` is `True`, the element at this position will be set to `value` 
+            '''
             attn_score = attn_score.masked_fill(padding_mask, value=float('-inf'))
         if causal_mask is not None:
             # After this causal_mask.shape = [batch_size, n_heads, seq_len, seq_len]
