@@ -15,7 +15,7 @@ class TransformerMultiHeadAttention(nn.Module):
         # assert d_model % n_heads == 0, "d_model must be a multiple of n_heads"
         self.hidden_size = d_model
         self.n_heads = n_heads
-        self.head_dim = self.hidden_size // self.n_heads
+        self.head_dim = self.hidden_size // self.n_heads # dimension of each head
         # Linear projective layers of Q K and V
         self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=False) # will be splitted into head_dim * n_heads
         self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
@@ -82,6 +82,50 @@ class TransformerMultiHeadAttention(nn.Module):
         # Concat the heads, after this, attn_score.shape = [batch_size, seq_len, hidden_size]
         attn_score = attn_score.transpose(1, 2).contiguous().view(batch_size, -1, self.hidden_size)
         return self.Wo(attn_score) # The last projection to generalize the knowledge of heads, attn_score = [batch_size, seq_len, hidden_size]
+
+
+# Identical to LLaMA 2, RoPE is leveraged along with GQA
+# Reference 
+# 1. https://github.com/meta-llama/llama/blob/main/llama/model.py
+# 2. https://mp.weixin.qq.com/s/1kH1Ht58cRfl2kR_KzNilw
+
+class TransformerGroupQueryAttention(nn.Module):
+    def __init__(self,
+                 d_model: int,
+                 n_heads: int,
+                 n_kv_heads: int, # number pf groups = n_heads // n_kv_heads
+                 *args, 
+                 **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.hidden_size = d_model
+        self.n_heads = n_heads
+        self.n_kv_heads = n_kv_heads
+
+        self.n_group = n_heads // n_kv_heads # number of groups
+        self.head_dim = self.hidden_size // self.n_heads
+
+        # Linear projective layers of Q K and V
+        self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=False) # will be splitted into head_dim * n_heads
+        self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.Wv = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+
+        # Linear projective layer of the concatenated output
+        self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+    
+    def _apply_rotary_emb(q: torch.Tensor,
+                          k: torch.Tensor,
+                          freqs_cis: torch.Tensor):
+        pass
+    
+
+    def forward(q: torch.Tensor,
+                k: torch.Tensor,
+                v: torch.Tensor,
+                freqs_cis: torch.Tensor,
+                padding_mask: torch.Tensor=None,
+                causal_mask:torch.Tensor=None):
+        pass
 
 
 
