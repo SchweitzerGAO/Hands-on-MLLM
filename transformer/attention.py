@@ -94,6 +94,7 @@ class TransformerGroupQueryAttention(nn.Module):
                  d_model: int,
                  n_heads: int,
                  n_kv_heads: int, # number pf groups = n_heads // n_kv_heads
+                 max_len: int = hparams.max_len,
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -101,6 +102,7 @@ class TransformerGroupQueryAttention(nn.Module):
         self.hidden_size = d_model
         self.n_heads = n_heads
         self.n_kv_heads = n_kv_heads
+        self.max_len = max_len
 
         self.n_group = n_heads // n_kv_heads # number of groups
         self.head_dim = self.hidden_size // self.n_heads
@@ -113,10 +115,45 @@ class TransformerGroupQueryAttention(nn.Module):
         # Linear projective layer of the concatenated output
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
     
-    def _apply_rotary_emb(q: torch.Tensor,
+    def _reshape_for_broadcast(freqs_cis: torch.Tensor,
+                               x: torch.Tensor):
+        """
+        Reshape freqs_cis to the shape of x
+        Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L107
+        freqs_cis.shape = [seq_len, head_dim // 2]
+        x.shape = [batch_size, seq_len, n_heads, head_dim // 2]
+        """
+        ndim = x.ndim
+        shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)] # shape = [1, seq_len, 1, head_dim // 2]
+        return freqs_cis.view(*shape)
+
+
+    def _apply_rotary_emb(self,
+                          q: torch.Tensor,
                           k: torch.Tensor,
                           freqs_cis: torch.Tensor):
-        pass
+        """
+        Apply rotary embedding
+        Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L132
+        q.shape = k.shape = [batch_size, seq_len, n_heads, head_dim]
+        freqs_cis.shape = [seq_len, head_dim]
+        """
+        batch_size, seq_len, n_heads = q.shape[:3]
+        # reshape q and k to complex
+        # complex_q.shape = complex_k.shape = [batch_size, seq_len, n_heads, head_dim // 2, 2]
+        complex_q = torch.view_as_complex(q.float().reshape(batch_size, seq_len, n_heads, -1, 2))
+        complex_k = torch.view_as_complex(k.float().reshape(batch_size, seq_len, n_heads, -1, 2))
+
+        # reshape freqs_cis to broadcast
+        freqs_cis = self._reshape_for_broadcast(freqs_cis, complex_q)
+
+        # perform complex multiplication
+        # real_q_with_rope.shape = real_k_with_rope.shape = [batch_size, seq_len, n_heads, head_dim]
+        real_q_with_rope = torch.view_as_real(complex_q * freqs_cis).flatten(3)
+        real_k_with_rope = torch.view_as_real(complex_k * freqs_cis).flatten(3)
+
+        return real_q_with_rope.type_as(q), real_k_with_rope.type_as(k)
+        
     
 
     def forward(q: torch.Tensor,
