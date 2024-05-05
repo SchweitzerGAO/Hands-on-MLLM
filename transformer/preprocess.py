@@ -51,3 +51,34 @@ def generate_dataset(batch_size,
     tgt_y = src[:, 1:]
 
     return src, tgt, tgt_y
+
+# Generate rotary matrix for RoPE, only compute once in the model
+# Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L80
+def generate_freq_cis(head_dim: int,
+                      max_len:int = hparams.max_len,
+                      base: float = 10000.0 # the base of generating rotary angles
+                      ):
+    # freqs = base ** (-2 * j / head_dim) freqs.shape = [head_dim // 2]
+
+    freqs = torch.pow(base, -(torch.arange(0, head_dim / 2)[:(head_dim // 2)].float()) / head_dim)
+
+    # positional index, idx.shape = [max_len]
+    idx = torch.arange(max_len)
+
+    """
+    freqs = 
+    [[0 * theta_0, 0 * theta_1, ..., 0 * theta_m]
+     [1 * theta_0, 1 * theta_1, ..., 1 * theta_m]
+     ...
+     [n * theta_0, n * theta_1, ..., n * theta_m]]
+     n = idx.shape[0], m = freqs.shape[0]
+     theta_i = base ** (i / head_dim) i \in [0, m]
+    """
+    freqs = torch.outer(idx, freqs).float()
+
+    '''
+    freqs_cis[a, b] = cos(a * theta_b) + sin(a * theta_b) * j, where j is the unit of complex
+    '''
+    freqs_cis = torch.polar(torch.ones_like(freqs), freqs)
+    return freqs_cis
+

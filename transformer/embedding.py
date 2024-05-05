@@ -40,7 +40,7 @@ class TransformerEmbedding(nn.Module):
             mul_term = torch.exp(torch.arange(0, self.hidden_size, 2) * -(torch.log(torch.tensor(10000.0)) / self.hidden_size))
         else:
             # Direct implementation
-            mul_term = torch.pow(torch.tensor(10000.0), -torch.arange(0, self.hidden_size, 2) / self.hidden_size) # mul_term.shape = [hidden_size / 2]
+            mul_term = torch.pow(torch.tensor(10000.0), -torch.arange(0, self.hidden_size, 2).float() / self.hidden_size) # mul_term.shape = [hidden_size / 2]
         
         pe[:,0::2] = torch.sin(positions * mul_term)
         pe[:,1::2] = torch.cos(positions * mul_term)
