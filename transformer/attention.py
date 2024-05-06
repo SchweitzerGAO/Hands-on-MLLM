@@ -93,24 +93,24 @@ class TransformerGroupQueryAttention(nn.Module):
     def __init__(self,
                  d_model: int,
                  n_heads: int,
-                 n_kv_heads: int, # number pf groups = n_heads // n_kv_heads
+                 n_kv_heads: int, # number of groups = n_heads // n_kv_heads
                  max_len: int = hparams.max_len,
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
         self.hidden_size = d_model
-        self.n_heads = n_heads
+        self.n_q_heads = n_heads
         self.n_kv_heads = n_kv_heads
         self.max_len = max_len
 
         self.n_group = n_heads // n_kv_heads # number of groups
-        self.head_dim = self.hidden_size // self.n_heads
+        self.head_dim = self.hidden_size // self.n_q_heads
 
         # Linear projective layers of Q K and V
-        self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=False) # will be splitted into head_dim * n_heads
-        self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.Wv = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.Wq = nn.Linear(self.hidden_size, self.n_q_heads * self.head_dim, bias=False) # will be splitted into head_dim * n_heads
+        self.Wk = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=False)
+        self.Wv = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=False)
 
         # Linear projective layer of the concatenated output
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
@@ -121,7 +121,7 @@ class TransformerGroupQueryAttention(nn.Module):
         Reshape freqs_cis to the shape of x
         Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L107
         freqs_cis.shape = [seq_len, head_dim // 2]
-        x.shape = [batch_size, seq_len, n_heads, head_dim // 2]
+        x.shape = [batch_size, seq_len, n_q_heads, head_dim // 2]
         """
         ndim = x.ndim
         shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)] # shape = [1, seq_len, 1, head_dim // 2]
@@ -136,33 +136,98 @@ class TransformerGroupQueryAttention(nn.Module):
         Apply rotary embedding
         Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L132
         q.shape = k.shape = [batch_size, seq_len, n_heads, head_dim]
-        freqs_cis.shape = [seq_len, head_dim]
+        freqs_cis.shape = [seq_len, head_dim // 2]
         """
-        batch_size, seq_len, n_heads = q.shape[:3]
-        # reshape q and k to complex
-        # complex_q.shape = complex_k.shape = [batch_size, seq_len, n_heads, head_dim // 2, 2]
+        batch_size, seq_len, n_heads = q.shape[:-1]
+        # reshape q and k to complex and group to pairs
+        # complex_q.shape = [batch_size, seq_len, n_q_heads, head_dim // 2]
+        # complex_k.shape = [batch_size, seq_len, n_kv_heads, head_dim // 2]
         complex_q = torch.view_as_complex(q.float().reshape(batch_size, seq_len, n_heads, -1, 2))
         complex_k = torch.view_as_complex(k.float().reshape(batch_size, seq_len, n_heads, -1, 2))
 
-        # reshape freqs_cis to broadcast
+        # reshape freqs_cis to broadcast, after this freqs_cis.shape = [1, seq_len, 1, head_dim // 2]
         freqs_cis = self._reshape_for_broadcast(freqs_cis, complex_q)
 
         # perform complex multiplication
         # real_q_with_rope.shape = real_k_with_rope.shape = [batch_size, seq_len, n_heads, head_dim]
+
         real_q_with_rope = torch.view_as_real(complex_q * freqs_cis).flatten(3)
         real_k_with_rope = torch.view_as_real(complex_k * freqs_cis).flatten(3)
 
         return real_q_with_rope.type_as(q), real_k_with_rope.type_as(k)
         
-    
+    def _repeat_kv(self, x: torch.Tensor):
+        """
+        Repeat the K and V for GQA
+        x.shape = [batch_size, seq_len, n_kv_heads, head_dim]
+        """
+        batch_size, seq_len = x.shape[:2]
+        if self.n_group == 1:
+            return x
+        repeated = x.unsqueeze(3) # equivalent to x[:, :, :, None, :] x.shape = [batch_size, seq_len, n_kv_heads, 1, head_dim]
+        repeated = repeated.repeat(1, 1, 1, self.n_group, 1)
+        return repeated.reshape(batch_size, seq_len, self.n_kv_heads * self.n_group, self.head_dim)
+        
 
-    def forward(q: torch.Tensor,
-                k: torch.Tensor,
-                v: torch.Tensor,
+
+    def forward(self, 
+                x: torch.Tensor,
                 freqs_cis: torch.Tensor,
                 padding_mask: torch.Tensor=None,
                 causal_mask:torch.Tensor=None):
-        pass
+        """
+        x.shape = [batch_size, seq_len, hidden_size]
+        freqs_cis.shape = [seq_len, head_dim // 2]
+
+        """
+        batch_size, seq_len = x.shape[:-1]
+        
+        # QKV projection
+        q = self.Wq(x)
+        k = self.Wk(x)
+        v = self.Wv(x)
+
+        q, k = self._apply_rotary_emb(q, k, freqs_cis)
+
+        # split heads, kv_head not equal to q_head
+        q = q.view(batch_size, seq_len, self.n_q_heads, self.head_dim)
+        k = k.view(batch_size, seq_len, self.n_kv_heads, self.head_dim)
+        v = v.view(batch_size, seq_len, self.n_kv_heads, self.head_dim)
+
+        # repeat KV heads, after this, k.shape = v.shape = [batch_size, seq_len, self.n_kv_heads * self.n_groups = self.n_q_heads, self.head_dim]
+        k = self._repeat_kv(k)
+        v = self._repeat_kv(v)
+
+        # transpose the 
+        # q.shape = k.shape = v.shape = [batch_size, n_q_heads, seq_len, head_dim]
+        q = q.transpose(1, 2) 
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
+
+        attn_score = torch.matmul(q, k.transpose(2, 3)) / (self.head_dim ** 0.5) # attn_score.shape = [batch_size, n_q_heads, seq_len, seq_len]
+
+        if padding_mask is not None:
+            # After this padding_mask.shape = [batch_size, n_heads, seq_len, seq_len]
+            padding_mask = padding_mask.unsqueeze(1).unsqueeze(1).repeat(1, self.n_heads, seq_len, 1)
+            '''
+            The document for masked_fill is useless. Referring to https://blog.csdn.net/jianyingyao7658/article/details/103382654, 
+            we can know that the padding_mask is of type `Tensor[bool]` and when `padding_mask` is `True`, the element at this position will be set to `value` 
+            '''
+            attn_score = attn_score.masked_fill(padding_mask, value=float('-inf'))
+        if causal_mask is not None:
+            # After this causal_mask.shape = [batch_size, n_heads, seq_len, seq_len]
+            causal_mask = causal_mask.expand(batch_size, self.n_heads, seq_len, seq_len)
+            # add the causal mask
+            attn_score = attn_score + causal_mask
+        attn_score = F.softmax(attn_score, dim=-1)
+
+        # last output
+        output = torch.matmul(attn_score, v) # shape = [batch_size, n_q_heads, seq_len, head_dim]
+        output = output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.hidden_size)
+        return self.Wo(output)
+
+
+
 
 
 
