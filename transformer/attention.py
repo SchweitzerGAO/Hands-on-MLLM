@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import hparams
+from preprocess import generate_freq_cis
 
 # Reference: https://github.com/YueZhengMeng/MyTransformer/blob/master/MyTransformer.py
 
@@ -115,7 +116,8 @@ class TransformerGroupQueryAttention(nn.Module):
         # Linear projective layer of the concatenated output
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
     
-    def _reshape_for_broadcast(freqs_cis: torch.Tensor,
+    def _reshape_for_broadcast(self,
+                               freqs_cis: torch.Tensor,
                                x: torch.Tensor):
         """
         Reshape freqs_cis to the shape of x
@@ -135,15 +137,15 @@ class TransformerGroupQueryAttention(nn.Module):
         """
         Apply rotary embedding
         Copied from https://github.com/meta-llama/llama/blob/main/llama/model.py#L132
-        q.shape = k.shape = [batch_size, seq_len, n_heads, head_dim]
+        q.shape = [batch_size, seq_len, n_q_heads, head_dim]
+        k.shape = [batch_size, seq_len, n_kv_heads, head_dim]
         freqs_cis.shape = [seq_len, head_dim // 2]
         """
-        batch_size, seq_len, n_heads = q.shape[:-1]
         # reshape q and k to complex and group to pairs
         # complex_q.shape = [batch_size, seq_len, n_q_heads, head_dim // 2]
         # complex_k.shape = [batch_size, seq_len, n_kv_heads, head_dim // 2]
-        complex_q = torch.view_as_complex(q.float().reshape(batch_size, seq_len, n_heads, -1, 2))
-        complex_k = torch.view_as_complex(k.float().reshape(batch_size, seq_len, n_heads, -1, 2))
+        complex_q = torch.view_as_complex(q.float().reshape(*q.shape[:-1], -1, 2))
+        complex_k = torch.view_as_complex(k.float().reshape(*k.shape[:-1], -1, 2))
 
         # reshape freqs_cis to broadcast, after this freqs_cis.shape = [1, seq_len, 1, head_dim // 2]
         freqs_cis = self._reshape_for_broadcast(freqs_cis, complex_q)
@@ -187,12 +189,14 @@ class TransformerGroupQueryAttention(nn.Module):
         k = self.Wk(x)
         v = self.Wv(x)
 
-        q, k = self._apply_rotary_emb(q, k, freqs_cis)
 
         # split heads, kv_head not equal to q_head
         q = q.view(batch_size, seq_len, self.n_q_heads, self.head_dim)
         k = k.view(batch_size, seq_len, self.n_kv_heads, self.head_dim)
         v = v.view(batch_size, seq_len, self.n_kv_heads, self.head_dim)
+
+        # apply the RoPE
+        q, k = self._apply_rotary_emb(q, k, freqs_cis)
 
         # repeat KV heads, after this, k.shape = v.shape = [batch_size, seq_len, self.n_kv_heads * self.n_groups = self.n_q_heads, self.head_dim]
         k = self._repeat_kv(k)
@@ -233,15 +237,16 @@ class TransformerGroupQueryAttention(nn.Module):
 
 
 if __name__ == '__main__':
-    mha = TransformerMultiHeadAttention(
+    gqa = TransformerGroupQueryAttention(
         d_model=hparams.hidden_size,
         n_heads=hparams.n_heads,
+        n_kv_heads=2,
+        max_len=hparams.max_len
     )
     batch_size = 2
     seq_len = 1024
-    q = torch.randn(batch_size, seq_len, hparams.hidden_size)
-    k = torch.randn(batch_size, seq_len, hparams.hidden_size)
-    v = torch.randn(batch_size, seq_len, hparams.hidden_size)
-    print(mha(q, k, v).shape)
+    x = torch.randn(batch_size, seq_len, hparams.hidden_size)
+    freqs_cis = generate_freq_cis(head_dim=hparams.hidden_size // hparams.n_heads, max_len=seq_len)
+    gqa(x, freqs_cis)
         
         
