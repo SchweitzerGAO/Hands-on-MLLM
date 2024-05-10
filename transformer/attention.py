@@ -18,9 +18,9 @@ class TransformerMultiHeadAttention(nn.Module):
         self.n_heads = n_heads
         self.head_dim = self.hidden_size // self.n_heads # dimension of each head
         # Linear projective layers of Q K and V
-        self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=False) # will be splitted into head_dim * n_heads
-        self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
-        self.Wv = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
+        self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=hparams.qkv_bias) # will be splitted into head_dim * n_heads
+        self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=hparams.qkv_bias)
+        self.Wv = nn.Linear(self.hidden_size, self.hidden_size, bias=hparams.qkv_bias)
 
         # Linear projective layer of the concatenated output
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
@@ -109,9 +109,9 @@ class TransformerGroupQueryAttention(nn.Module):
         self.head_dim = self.hidden_size // self.n_q_heads
 
         # Linear projective layers of Q K and V
-        self.Wq = nn.Linear(self.hidden_size, self.n_q_heads * self.head_dim, bias=False) # will be splitted into head_dim * n_heads
-        self.Wk = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=False)
-        self.Wv = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=False)
+        self.Wq = nn.Linear(self.hidden_size, self.n_q_heads * self.head_dim, bias=hparams.qkv_bias) # will be splitted into head_dim * n_heads
+        self.Wk = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=hparams.qkv_bias)
+        self.Wv = nn.Linear(self.hidden_size, self.n_kv_heads * self.head_dim, bias=hparams.qkv_bias)
 
         # Linear projective layer of the concatenated output
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size, bias=False)
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     batch_size = 2
     seq_len = 1024
     x = torch.randn(batch_size, seq_len, hparams.hidden_size)
-    freqs_cis = generate_freq_cis(head_dim=hparams.hidden_size // hparams.n_heads, max_len=seq_len)
+    freqs_cis = generate_freq_cis(head_dim=hparams.hidden_size // hparams.n_heads, max_len=seq_len) # only [:seq_len] will be used in freqs_cis in generation
     gqa(x, freqs_cis)
         
         

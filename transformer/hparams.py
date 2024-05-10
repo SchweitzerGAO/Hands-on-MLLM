@@ -4,6 +4,7 @@ hidden_size = 512
 max_len = 4096
 num_layers = 3
 n_heads = 8
+qkv_bias = False
 
 # Transformer training related
 seed = 42
