@@ -4,9 +4,12 @@ import torch.nn.functional as F
 import hparams
 from preprocess import generate_freq_cis
 
-# Reference: https://github.com/YueZhengMeng/MyTransformer/blob/master/MyTransformer.py
+
 
 class TransformerMultiHeadAttention(nn.Module):
+    """
+    Reference: https://github.com/YueZhengMeng/MyTransformer/blob/master/MyTransformer.py
+    """
     def __init__(self,
                  d_model, # hidden size of the model
                  n_heads, # number of heads
@@ -85,12 +88,14 @@ class TransformerMultiHeadAttention(nn.Module):
         return self.Wo(attn_score) # The last projection to generalize the knowledge of heads, attn_score = [batch_size, seq_len, hidden_size]
 
 
-# Identical to LLaMA 2, RoPE is leveraged along with GQA
-# Reference 
-# 1. https://github.com/meta-llama/llama/blob/main/llama/model.py
-# 2. https://mp.weixin.qq.com/s/1kH1Ht58cRfl2kR_KzNilw
 
 class TransformerGroupQueryAttention(nn.Module):
+    """
+    Identical to LLaMA 2, RoPE is leveraged along with GQA
+    Reference 
+    1. https://github.com/meta-llama/llama/blob/main/llama/model.py
+    2. https://mp.weixin.qq.com/s/1kH1Ht58cRfl2kR_KzNilw
+    """
     def __init__(self,
                  d_model: int,
                  n_heads: int,

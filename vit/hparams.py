@@ -12,7 +12,7 @@ class ViTConfig:
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.n_heads = n_heads
-        self.p_dropout = 0.1
+        self.p_dropout = 0.0
         self.image_size = image_size #  size of the input image. actual image size = image_size ** 2
         self.patch_size = patch_size #  size of the patch size, actual patch size = patch_size ** 2
         self.layer_norm_eps = layer_norm_eps

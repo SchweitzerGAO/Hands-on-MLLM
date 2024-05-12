@@ -136,19 +136,20 @@ class ViTEmbedding(nn.Module):
             embeddings = embeddings + self._interpolate_pos_embedding(embeddings, height, width)
         else:
             embeddings = embeddings + self.position_embedding # boardcast and add
-        
         return self.dropout(embeddings)
 
 if __name__ == '__main__':
     image_path = './test.jpg'
     transform = transforms.Compose([
-        transforms.Resize(336), # resize to 224 * 224
-        transforms.CenterCrop(336), # crop an 224 * 224 image from the center
+        transforms.Resize(224), # resize to 224 * 224
+        transforms.CenterCrop(224), # crop an 24 * 224 image from the center
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     ])
     image = transform(Image.open(image_path))
+    print(image.shape)
+    # save_image(image, './no_norm.png')
     config = ViTConfig()
     emb = ViTEmbedding(config)
     print(emb(image.unsqueeze(0)).shape)
