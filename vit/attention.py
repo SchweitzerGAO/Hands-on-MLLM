@@ -61,5 +61,7 @@ class ViTAttention(nn.Module):
         context_layer = torch.matmul(attn_score, v) # context_layer.shape = [bs, n_heads, seq_len, head_dim]
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
+        context_layer = self.Wo(context_layer)
+        context_layer = self.dropout_output(context_layer)
         outputs = (context_layer, attn_score) if output_attention else (context_layer,)
         return outputs   
