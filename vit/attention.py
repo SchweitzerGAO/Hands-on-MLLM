@@ -1,13 +1,13 @@
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
-from hparams import ViTConfig
+from config import ViTConfig
 from typing import Optional
 
 class ViTAttention(nn.Module):
     """
     Attention for ViT
-    Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py#L179
+    Derived from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py#L179
     """
     def __init__(self,
                  config: ViTConfig,
@@ -23,10 +23,9 @@ class ViTAttention(nn.Module):
         self.Wq = nn.Linear(self.hidden_size, self.hidden_size, bias=self.qkv_bias)
         self.Wk = nn.Linear(self.hidden_size, self.hidden_size, bias=self.qkv_bias)
         self.Wv = nn.Linear(self.hidden_size, self.hidden_size, bias=self.qkv_bias)
-        self.dropout_attn = nn.Dropout(config.p_dropout)
+        self.dropout = nn.Dropout(config.p_dropout)
 
         self.Wo = nn.Linear(self.hidden_size, self.hidden_size)
-        self.dropout_output = nn.Dropout(config.p_dropout)
 
     def forward(self, 
                 hidden_state: torch.Tensor, 
@@ -51,7 +50,7 @@ class ViTAttention(nn.Module):
         # do dot-product MHA, attn_score.shape = [bs, n_heads, seq_len, seq_len]
         attn_score = torch.matmul(q, k.transpose(-1, -2)) / (self.hidden_size ** 0.5)
         attn_score = F.softmax(attn_score, dim=-1) # this do not change the shape of attn_score
-        attn_score = self.dropout_attn(attn_score)
+        attn_score = self.dropout(attn_score)
 
         # mask some heads
         if head_mask is not None:
@@ -62,6 +61,5 @@ class ViTAttention(nn.Module):
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous().view(batch_size, seq_len, self.hidden_size)
         context_layer = self.Wo(context_layer)
-        context_layer = self.dropout_output(context_layer)
         outputs = (context_layer, attn_score) if output_attention else (context_layer,)
         return outputs   

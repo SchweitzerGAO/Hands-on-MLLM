@@ -1,7 +1,7 @@
 import torch 
 import torch.nn as nn
 import torch.nn.functional as F
-from hparams import ViTConfig
+from config import ViTConfig
 from typing import Optional
 from PIL import Image
 from torchvision.transforms import transforms

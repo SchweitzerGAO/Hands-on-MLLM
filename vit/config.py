@@ -10,6 +10,7 @@ class ViTConfig:
                  num_channels: int = 3, # RGB channel by default
                  qkv_bias: bool = True) -> None:
         self.hidden_size = hidden_size
+        self.intermediate_size = 4 * hidden_size
         self.num_layers = num_layers
         self.n_heads = n_heads
         self.p_dropout = 0.0

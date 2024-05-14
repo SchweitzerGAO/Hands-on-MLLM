@@ -16,12 +16,12 @@ class TransformerMLP(nn.Module):
         self.d_ff = d_ff
 
         # Layers
-        self.linear1 = nn.Linear(self.hidden_size, self.d_ff) # after this shape = [batch_size, seq_len, d_ff]
+        self.up_sample = nn.Linear(self.hidden_size, self.d_ff) # after this shape = [batch_size, seq_len, d_ff]
         self.dropout = nn.Dropout(p_dropout) # Why ?
         self.activation = nn.ReLU()
-        self.linear2 = nn.Linear(self.d_ff, self.hidden_size) # after this shape = [batch_size, seq_len, hidden_size]
+        self.down_sample = nn.Linear(self.d_ff, self.hidden_size) # after this shape = [batch_size, seq_len, hidden_size]
     
     def forward(self, x: torch.Tensor):
-        x = self.linear2(self.activation(self.dropout(self.linear1(x))))
+        x = self.down_sample(self.activation(self.dropout(self.up_sample(x))))
         return x
     
