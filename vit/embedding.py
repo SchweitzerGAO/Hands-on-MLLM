@@ -58,8 +58,8 @@ class ViTEmbedding(nn.Module):
         super().__init__(*args, **kwargs)
 
         self.config = config
-        self.patch_embedding = ViTPatchEmbedding(config)
 
+        self.patch_embedding = ViTPatchEmbedding(config)
         # The learnable mask token, currently unused
         self.mask_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size)) if use_mask_token else None
         # The learnable [class] token for image classification
@@ -122,7 +122,8 @@ class ViTEmbedding(nn.Module):
         """
         image_pixels.shape = [batch_size, num_channels, height, width]
         """
-        batch_size, num_channels, height, width = image_pixels.shape
+        interpolate = interpolate if interpolate is not None else self.config.interpolate
+        batch_size, _, height, width = image_pixels.shape
 
         embeddings = self.patch_embedding(image_pixels)
 

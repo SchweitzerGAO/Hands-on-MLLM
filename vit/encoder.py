@@ -4,6 +4,8 @@ from config import ViTConfig
 from attention import ViTAttention
 from mlp import ViTMLP
 from typing import Optional
+from torch.utils.checkpoint import checkpoint
+from functools import partial
 
 class ViTEncoderBlock(nn.Module):
     """
@@ -51,13 +53,17 @@ class ViTEncoderBlock(nn.Module):
 class ViTEncoder(nn.Module):
     """
     The encoder part of ViT
-    Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py#L369
+    Derived from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py#L369
     """
     def __init__(self, 
                  config: ViTConfig,
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        """
+        self._gradient_checkpointing_func is set to fully follow the transformers
+        """
+        self._gradient_checkpointing_func = partial(checkpoint, use_reentrant=True)
         self.config = config
         self.layers = nn.ModuleList([ViTEncoderBlock(config) for _ in range(config.num_layers)])
         self.gradient_checkpointing = False
@@ -87,6 +93,11 @@ class ViTEncoder(nn.Module):
             layer_head_mask = head_mask[i] if head_mask is not None else None
 
             if self.gradient_checkpointing and self.training:
+                '''
+                self._gradient_checkpointing_func is from:
+                https://github.com/huggingface/transformers/blob/1360801a69c0b169e3efdbb0cd05d9a0e72bfb70/src/transformers/modeling_utils.py#L2251
+
+                '''
                 layer_outputs = self._gradient_checkpointing_func(
                     layer_module.__call__,
                     hidden_state,
@@ -105,7 +116,7 @@ class ViTEncoder(nn.Module):
             all_hidden_states = all_hidden_states + (hidden_state,)
 
         if not return_dict:
-            return tuple(v for v in [hidden_state, all_hidden_states, all_self_attentions] if v is not None)
+            return tuple(v for v in [hidden_state, all_hidden_states, all_self_attentions])
         return dict(
             last_hidden_state=hidden_state,
             hidden_states=all_hidden_states,
