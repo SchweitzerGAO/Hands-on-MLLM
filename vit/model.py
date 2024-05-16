@@ -15,7 +15,8 @@ class ViTModel(nn.Module):
     """
     def __init__(self,
                  config: ViTConfig, 
-                 use_mask_token: bool = False, 
+                 use_mask_token: bool = False,
+                 add_pool: bool = True, 
                  *args, 
                  **kwargs) -> None:
         
@@ -27,7 +28,7 @@ class ViTModel(nn.Module):
 
         self.ln_after_encoder = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
 
-        self.pooler =  ViTPooler(config) if config.add_pool else None
+        self.pooler =  ViTPooler(config) if add_pool else None
     
     def forward(self, 
                 image_pixel: torch.Tensor,
@@ -70,10 +71,10 @@ class ViTModel(nn.Module):
         
         """
         encoder_outputs = self.encoder(embedding_output,
-                                      head_mask,
-                                      output_attentions,
-                                      output_hidden_states,
-                                      return_dict
+                                       head_mask,
+                                       output_attentions,
+                                       output_hidden_states,
+                                       return_dict
                                       )
         
         last_hidden_state = encoder_outputs['last_hidden_state'] if return_dict else encoder_outputs[0]
@@ -90,4 +91,49 @@ class ViTModel(nn.Module):
                 hidden_states=encoder_outputs['hidden_states'],
                 attentions=encoder_outputs['attentions']
             )
-        
+        return encoder_outputs
+
+class ViTForImageClassification(nn.Module):
+    """
+    Image classification ViT model
+    Derived from: 
+    """
+    def __init__(self,
+                 config: ViTConfig,
+                 *args, 
+                 **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.config = config
+
+        self.model = ViTModel(config, add_pool=False)
+        self.lm_head = nn.Linear(config.hidden_size, config.num_labels) # classification head
+
+    
+    def forward(self, 
+                image_pixels: torch.Tensor,
+                head_mask: Optional[torch.Tensor] = None,
+                output_attentions: Optional[bool] = None,
+                output_hidden_states: Optional[bool] = None,
+                interpolate: Optional[bool] = None,
+                return_dict: Optional[bool] = None,
+                ):
+        encoder_outputs = self.model(image_pixels,
+                                     head_mask=head_mask,
+                                     output_attentions=output_attentions,
+                                     output_hidden_states=output_hidden_states,
+                                     interpolate=interpolate,
+                                     return_dict=return_dict
+                                     )
+        last_hidden_state = encoder_outputs['last_hidden_state'] if return_dict else encoder_outputs[0]
+        cls_hidden_state = last_hidden_state[:, 0, :] # shape = [1, hidden_size]
+        logits = self.lm_head(cls_hidden_state) # shape = [1, num_labels]
+
+        if not return_dict:
+            outputs = (logits,) + outputs[2:]
+        else:
+            outputs = dict(
+                logits=logits,
+                hidden_states=encoder_outputs['hidden_states'],
+                attentions=encoder_outputs['attentions']
+            )
+        return outputs
