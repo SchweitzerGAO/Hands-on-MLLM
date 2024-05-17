@@ -147,8 +147,8 @@ class TransformerGroupQueryAttention(nn.Module):
         freqs_cis.shape = [seq_len, head_dim // 2]
         """
         # reshape q and k to complex and group to pairs
-        # complex_q.shape = [batch_size, seq_len, n_q_heads, head_dim // 2]
-        # complex_k.shape = [batch_size, seq_len, n_kv_heads, head_dim // 2]
+        # complex_q.shape = [batch_size, seq_len, n_q_heads, head_dim // 2, 2]
+        # complex_k.shape = [batch_size, seq_len, n_kv_heads, head_dim // 2, 2]
         complex_q = torch.view_as_complex(q.float().reshape(*q.shape[:-1], -1, 2))
         complex_k = torch.view_as_complex(k.float().reshape(*k.shape[:-1], -1, 2))
 

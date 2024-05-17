@@ -58,6 +58,21 @@ class TransformerEmbedding(nn.Module):
         x = x + self.pe[:, :x.shape[1], :].requires_grad_(False) # add positional embedding
         return self.dropout(x) # dropout
 
+class TransformerRotaryEmbedding(nn.Module):
+    """
+    transformers-style rotary embedding implementation
+    Reference: https://github.com/YueZhengMeng/MyLlama/blob/master/MyLlama.py#L52 
+    and https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L96
+    """
+    def __init__(self, 
+                 head_dim: int = hparams.hidden_size // hparams.n_heads,
+                 max_len: int = hparams.max_len,
+                 
+                 *args, 
+                 **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+
 
 if __name__ == '__main__':
     embed = TransformerEmbedding(
@@ -70,3 +85,4 @@ if __name__ == '__main__':
     tokens = torch.randint(0,hparams.vocab_size,(batch_size, seq_len),dtype=torch.int64)
     shape = embed(tokens).shape
     assert shape[0] == batch_size and shape[1] == seq_len and shape[2] == hparams.hidden_size
+

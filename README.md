@@ -5,9 +5,9 @@
 ## TODO
 
 - [x] Transformer(Training task: Sequence repeater)
-- [ ] BERT
+- [x] BERT
 - [ ] GPT
-- [ ] ViT
+- [x] ViT
 - [ ] BLIP-2 (Q-Former)
 - [ ] DiT
 - [ ] VQ-VAE
