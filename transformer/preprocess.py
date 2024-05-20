@@ -60,7 +60,7 @@ def generate_freq_cis(head_dim: int,
                       ):
     # freqs = base ** (-2 * j / head_dim) freqs.shape = [head_dim // 2]
 
-    freqs = torch.pow(base, -(torch.arange(0, head_dim / 2)[:(head_dim // 2)].float()) / head_dim)
+    freqs = torch.pow(base, -(torch.arange(0, head_dim, 2)[:(head_dim // 2)].float()) / head_dim)
 
     # positional index, idx.shape = [max_len]
     idx = torch.arange(max_len)
@@ -72,7 +72,7 @@ def generate_freq_cis(head_dim: int,
      ...
      [n * theta_0, n * theta_1, ..., n * theta_m]]
      n = idx.shape[0], m = freqs.shape[0]
-     theta_i = base ** (i / head_dim) i \in [0, m]
+     theta_i = base ** (-2i / head_dim) i \in [0, m]
     """
     freqs = torch.outer(idx, freqs).float()
 

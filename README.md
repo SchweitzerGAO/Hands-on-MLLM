@@ -8,6 +8,8 @@
 - [x] BERT
 - [ ] GPT
 - [x] ViT
+- [ ] CLIP
+- [ ] BLIP
 - [ ] BLIP-2 (Q-Former)
 - [ ] DiT
 - [ ] VQ-VAE

@@ -251,7 +251,12 @@ if __name__ == '__main__':
     batch_size = 2
     seq_len = 1024
     x = torch.randn(batch_size, seq_len, hparams.hidden_size)
-    freqs_cis = generate_freq_cis(head_dim=hparams.hidden_size // hparams.n_heads, max_len=seq_len) # only [:seq_len] will be used in freqs_cis in generation
+    """
+    only [:seq_len] will be used in freqs_cis in generation.
+    In the original implementation of this method, another parameter `end`(which will be set to `seq_len`) is passed to truncate the freq_cis,
+    and the parameter `max_len` will be set to the maximum training length
+    """
+    freqs_cis = generate_freq_cis(head_dim=hparams.hidden_size // hparams.n_heads, max_len=seq_len) 
     gqa(x, freqs_cis)
         
         

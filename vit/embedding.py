@@ -102,7 +102,7 @@ class ViTEmbedding(nn.Module):
         # see discussion at https://github.com/facebookresearch/dino/issues/8
         h0, w0 = h0 + 0.1, w0 + 0.1
         patch_pos_embed = patch_pos_embed.reshape(1, int(num_positions ** 0.5), int(num_positions ** 0.5), hidden_size)
-        patch_pos_embed = patch_pos_embed.permute(0, 3, 1, 2) # shape = =[1, hidden_size, sqrt(num_positions), sqrt(num_positions)]
+        patch_pos_embed = patch_pos_embed.permute(0, 3, 1, 2) # shape = [1, hidden_size, sqrt(num_positions), sqrt(num_positions)]
         patch_pos_embed = F.interpolate(
             patch_pos_embed,
             scale_factor=(h0 / (num_positions ** 0.5), w0 / (num_positions ** 0.5)),

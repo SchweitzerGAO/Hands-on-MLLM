@@ -44,7 +44,7 @@ class TransformerEmbedding(nn.Module):
         
         pe[:,0::2] = torch.sin(positions * mul_term)
         pe[:,1::2] = torch.cos(positions * mul_term)
-        pe = pe.unsqueeze(0) # pe.shape = [1, max_len, hidden_size], convenient for batchify computing
+        pe = pe.unsqueeze(0) # pe.shape = [1, max_len, hidden_size], convenient for broadcasting
         # pe.requires_grad_(False)
         return pe
         
@@ -60,17 +60,111 @@ class TransformerEmbedding(nn.Module):
 
 class TransformerRotaryEmbedding(nn.Module):
     """
-    transformers-style rotary embedding implementation
+    Transformers-style RoPE implementation
     Reference: https://github.com/YueZhengMeng/MyLlama/blob/master/MyLlama.py#L52 
     and https://github.com/huggingface/transformers/blob/main/src/transformers/models/llama/modeling_llama.py#L96
+    The major differences are:
+    1. No complex-field computation
+    2. group every d/2 position
     """
     def __init__(self, 
                  head_dim: int = hparams.hidden_size // hparams.n_heads,
                  max_len: int = hparams.max_len,
-                 
+                 base: int = 10000,
+                 device = None, 
                  *args, 
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.head_dim = head_dim
+        self.max_len = max_len
+        self.base = base
+        # base ** (-2i / headdim)
+        inv_freq = 1.0 / (self.base ** (torch.arange(0, self.dim, 2).float().to(device) / self.head_dim))
+
+        # 如果一个参数不参与梯度下降,但又希望保存model的时候将其保存下来
+        # 这个时候就可以用register_buffer
+        # persistent = False: do not save this field in the state_dict
+        self.register_buffer("inv_freq", inv_freq, persistent=False)
+        self._set_cos_sin_cache(
+            seq_len=max_len, device=self.inv_freq.device, dtype=torch.get_default_dtype()
+        )
+    
+    def _set_cos_sin_cache(self, 
+                           seq_len: int, 
+                           device: torch.device, 
+                           dtype: torch.dtype):
+        self.max_seq_len_cached = seq_len
+
+        # Generate the positional indices
+        t = torch.arange(self.max_seq_len_cached, device=device, dtype=torch.get_default_dtype())
+
+        """
+        freqs.shape = [seq_len, head_dim // 2]
+        freqs = 
+        [[0 * theta_0, 0 * theta_1, ..., 0 * theta_m]
+         [1 * theta_0, 1 * theta_1, ..., 1 * theta_m]
+         ...
+         [n * theta_0, n * theta_1, ..., n * theta_m]]
+         n = seq_len, m = head_dim // 2
+        theta_i = base ** (-2i / head_dim) i \in [0, m]
+        """
+        freqs = torch.outer(t, self.inv_freq)
+
+        """
+        emb.shape = [seq_len, head_dim]
+        embs = 
+        [[0 * theta_0, 0 * theta_1, ..., 0 * theta_m, 0 * theta_0, 0 * theta_1, ..., 0 * theta_m]
+         [1 * theta_0, 1 * theta_1, ..., 1 * theta_m, 1 * theta_0, 1 * theta_1, ..., 1 * theta_m],
+         ...
+         [n * theta_0, n * theta_1, ..., n * theta_m, n * theta_0, n * theta_1, ..., n * theta_m]]
+         n = seq_len, m = head_dim // 2
+        theta_i = base ** (-2i / head_dim) i \in [0, m]
+        """
+        emb = torch.cat((freqs, freqs),dim=-1)
+
+        self.register_buffer("cos_cached", emb.cos().to(dtype), persistent=False)
+        self.register_buffer("sin_cached", emb.sin().to(dtype), persistent=False)
+    
+    def _rotate_half(x: torch.Tensor):
+        """
+        x.shape = [batch_size, seq_len, n_heads, head_dim]
+        returns:
+        [-q_{d/2}, -q_{d/2 + 1}, ... -q{d}, q_{0}, q_{1},... q{d/2-1}]
+        """
+        x1 = x[..., : x.shape[-1] // 2]
+        x2 = x[..., x.shape[-1] // 2 :]
+        return torch.cat((-x2, x1), dim=-1)
+    def forward(self, 
+                q: torch.Tensor,
+                k: torch.Tensor,
+                position_ids: torch.Tensor,
+                unsqueeze_dim: int = 1
+                ):
+        """
+        q.shape = [batch_size, seq_len, n_q_heads, head_dim]
+        k.shape = [batch_size, seq_len, n_kv_heads, head_dim]
+        position_ids is the newly seen length. e.g. 1st time inference seq_len = 10 then position_ids = torch.arange(10), second time seq_len=20, position_ids = torch.arange(10, 20)
+        unsqueeze_dim, the dimension to unsqueeze
+        """
+        seq_len = q.shape[1]
+        
+        # the input seq_len is longer than the cached one, then update the cache
+        if seq_len > self.max_seq_len_cached:
+            self._set_cos_sin_cache(seq_len=seq_len, device=q.device, dtype=q.dtype)
+        
+        # cos_cached.shape = sin_cached.shape = [seq_len, head_dim]
+        cos_cached = self.cos_cached[:seq_len].to(dtype=q.dtype)
+        sin_cached = self.sin_cached[:seq_len].to(dtype=q.dtype)
+
+        # cos_utilized.shape = sin_utilized.shape = [len(position_ids), 1, head_dim], to broadcast when performing hardmard product
+        cos_utilized = cos_cached[position_ids].unsqueeze(unsqueeze_dim)
+        sin_utilized = sin_cached[position_ids].unsqueeze(unsqueeze_dim)
+
+        # The deduction of this is in RoPE.ipynb, source: https://github.com/YueZhengMeng/MyLlama/blob/master/RoPE.ipynb
+        q_embedded = (q * cos_utilized) + self._rotate_half(q) * sin_utilized
+        k_embedded = (k * cos_utilized) + self._rotate_half(k) * sin_utilized
+
+        return q_embedded, k_embedded
 
 
 

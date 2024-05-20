@@ -4,7 +4,7 @@ from config import ViTConfig
 
 class ViTPooler(nn.Module):
     """
-    A pooler of the last hidden state of [CLS], where does this idea come from?
+    A pooler of the last hidden state of [CLS], where does this idea come from? This actually is not used in ViT but used in bert
     A reasonable explanation is: This pooler converts BERT-style embeddings to downstream task embedding, which may improve the performance
     Copied from https://github.com/huggingface/transformers/blob/main/src/transformers/models/vit/modeling_vit.py#L594
     """
