@@ -1,4 +1,3 @@
-# ViT model related
 class ViTConfig:
     def __init__(self,
                  hidden_size: int = 768,

@@ -27,7 +27,7 @@ class ViTPatchEmbedding(nn.Module):
         
         """
         The projection layer
-        nn.Conv2d(in_channel, out_channel, kernel_size, stride, dilation, padding) x = 1,2,3
+        nn.Conv2d(in_channel, out_channel, kernel_size, stride, dilation, padding)
         input to Conv2d shape = [batch_size, in_channel, in_height, in_width] 
         output from Conv2d.shape = [batch_size, out_channel, out_height, out_width]
         the calculation of out_height and out_width: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html#torch.nn.Conv2d
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     image_path = './test.jpg'
     transform = transforms.Compose([
         transforms.Resize(224), # resize to 224 * 224
-        transforms.CenterCrop(224), # crop an 24 * 224 image from the center
+        transforms.CenterCrop(224), # crop an 224 * 224 image from the center
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 

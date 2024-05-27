@@ -35,7 +35,7 @@ class Transformer(nn.Module):
 
         memory = self.encoder(src_embed,src_key_padding_mask)
         out = self.decoder(tgt_embed, memory, tgt_causal_mask, tgt_key_padding_mask, src_key_padding_mask)
-        # return out because the pipelines of training and inferencing are different. The lm_head layer will be used outside this function
+        # return out because the pipelines of training(use all) and inferencing(use last one) are different. The lm_head layer will be used outside this function
         return out
 
 
