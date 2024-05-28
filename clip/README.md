@@ -39,13 +39,16 @@ def clip_loss(similarity: torch.Tensor) -> torch.Tensor:
     caption_loss = contrastive_loss(similarity)
     image_loss = contrastive_loss(similarity.t())
     return (caption_loss + image_loss) / 2.0
-
 ```
 
 ## Some questions and possible answers
 
 - Why `[EOT]` for text representation?
 
+- Why decoder framework for text encoder?
 
+The possible answers of these 2 questions can be found here in the paper
 
-- Why decoder framework for text encoder
+![](img/1.PNG)
+
+Personally speaking, the `[EOT]` is treated as the text feature because decoder framework is used. If we use encoder framework(BERT-style) text encoders, I think `[CLS]` will be treated as the text feature
