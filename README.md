@@ -6,9 +6,9 @@
 
 - [x] Transformer(Training task: Sequence repeater)
 - [x] BERT
-- [ ] GPT
+- [x] GPT
 - [x] ViT
-- [ ] CLIP
+- [x] CLIP
 - [ ] BLIP
 - [ ] BLIP-2 (Q-Former)
 - [ ] DiT
